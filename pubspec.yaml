@@ -1,0 +1,49 @@
+name: pos_tablet_v7
+description: Sistema POS para tablet Android 10.1"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Base de datos
+  sqflite: ^2.3.0
+  sqflite_common_ffi: ^2.3.0
+  path: ^1.8.3
+  path_provider: ^2.1.1
+
+  # Gestión de estado
+  provider: ^6.1.1
+
+  # Permisos y almacenamiento
+  permission_handler: ^11.0.1
+
+  # JSON y respaldos
+  share_plus: ^7.2.1
+  file_picker: ^8.0.0
+
+  # UI utilities
+  intl: ^0.18.1
+  shared_preferences: ^2.5.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_launcher_icons: ^0.13.1
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/paisaje.jpg
+    - assets/logo.png  # ⭐ Agregamos el logo aquí también para que Flutter lo reconozca
+
+# ⭐ AQUÍ ESTÁ LA CONFIGURACIÓN QUE FALTABA PARA EL LOGO
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/logo.png"

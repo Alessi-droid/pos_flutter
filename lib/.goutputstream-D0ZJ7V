@@ -1,0 +1,206 @@
+// lib/main.dart
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'constants/app_constants.dart';
+import 'providers/turno_provider.dart';
+import 'providers/inventario_provider.dart';
+import 'providers/venta_provider.dart';
+import 'providers/finanzas_provider.dart';
+import 'providers/config_provider.dart';
+import 'providers/prestamos_provider.dart';
+
+// Importamos la pantalla de ventas (aseguramos que coincida con tu archivo)
+import 'screens/venta_screen.dart'; 
+import 'screens/inventario_screen.dart';
+import 'screens/finanzas_screen.dart';
+import 'screens/prestamos_screen.dart';
+import 'screens/metricas_screen.dart';
+import 'screens/historial_screen.dart';
+import 'widgets/apertura_caja_dialog.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('es', null);
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => TurnoProvider()),
+        ChangeNotifierProvider(create: (_) => InventarioProvider()),
+        ChangeNotifierProvider(create: (_) => VentaProvider()),
+        ChangeNotifierProvider(create: (_) => FinanzasProvider()),
+        ChangeNotifierProvider(create: (_) => ConfigProvider()),
+        ChangeNotifierProvider(create: (_) => PrestamosProvider()),
+      ],
+      child: MaterialApp(
+        title: 'POS Tablet',
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+          fontFamily: 'Roboto',
+          useMaterial3: true,
+        ),
+        debugShowCheckedModeBanner: false,
+        home: const MainScreen(),
+      ),
+    );
+  }
+}
+
+class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
+
+  @override
+  State<MainScreen> createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  int _selectedIndex = 0;
+  final FocusNode _mainKeyFocus = FocusNode();
+
+  // ⭐ AQUÍ ARREGLAMOS EL ERROR DE LA "S"
+  final List<Widget> _screens = const [
+    VentaScreen(), 
+    InventarioScreen(),
+    FinanzasScreen(),
+    PrestamosScreen(),
+    MetricasScreen(),
+    HistorialScreen(),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 6, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) {
+        _cambiarPestana(_tabController.index);
+      }
+    });
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _verificarTurnoActivo();
+      _mainKeyFocus.requestFocus();
+    });
+  }
+
+  void _cambiarPestana(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+
+    if (index == 0) {
+      context.read<VentaProvider>().cargarProductos();
+    } else if (index == 1) {
+      context.read<InventarioProvider>().cargarProductos(); 
+    } else if (index == 2) {
+      final turnoId = context.read<TurnoProvider>().turnoActivo?.id;
+      if (turnoId != null) context.read<FinanzasProvider>().cargarBalance(turnoId);
+    } else if (index == 3) {
+      context.read<PrestamosProvider>().cargarDatos();
+    }
+  }
+
+  void _handleGlobalKeys(RawKeyEvent event) {
+    if (event is! RawKeyDownEvent) return;
+    final key = event.logicalKey;
+
+    if (key == LogicalKeyboardKey.f1) { _tabController.animateTo(0); _cambiarPestana(0); }
+    else if (key == LogicalKeyboardKey.f2) { _tabController.animateTo(1); _cambiarPestana(1); }
+    else if (key == LogicalKeyboardKey.f3) { _tabController.animateTo(2); _cambiarPestana(2); }
+    else if (key == LogicalKeyboardKey.f4) { _tabController.animateTo(3); _cambiarPestana(3); }
+    else if (key == LogicalKeyboardKey.f5) { _tabController.animateTo(4); _cambiarPestana(4); }
+    else if (key == LogicalKeyboardKey.f6) { _tabController.animateTo(5); _cambiarPestana(5); }
+    else if (key == LogicalKeyboardKey.keyF) {
+      if (_tabController.index != 0) {
+        _tabController.animateTo(0);
+        _cambiarPestana(0);
+      }
+    }
+  }
+
+  Future<void> _verificarTurnoActivo() async {
+    final turnoProvider = context.read<TurnoProvider>();
+    await turnoProvider.cargarTurnoActivo(); 
+
+    if (!turnoProvider.hayTurnoActivo && mounted) {
+      final montoInicial = await showDialog<double>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AperturaCajaDialog(),
+      );
+
+      if (montoInicial != null) {
+        await turnoProvider.abrirCaja(montoInicial);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _mainKeyFocus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RawKeyboardListener(
+      focusNode: _mainKeyFocus,
+      onKey: _handleGlobalKeys,
+      autofocus: true,
+      child: Scaffold(
+        backgroundColor: Colors.grey.shade100,
+        // ⭐ AQUÍ ESTÁ EL NUEVO DISEÑO: PARTIMOS LA PANTALLA
+        body: Row(
+          children: [
+            // 1. EL NUEVO MENÚ LATERAL (NavigationRail)
+            NavigationRail(
+              selectedIndex: _selectedIndex,
+              onDestinationSelected: (int index) {
+                _tabController.animateTo(index);
+                _cambiarPestana(index);
+              },
+              labelType: NavigationRailLabelType.all,
+              selectedIconTheme: const IconThemeData(color: AppColors.primaryBlue, size: 30),
+              unselectedIconTheme: IconThemeData(color: Colors.grey.shade500, size: 24),
+              selectedLabelTextStyle: const TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.bold, fontSize: 12),
+              unselectedLabelTextStyle: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+              backgroundColor: Colors.white,
+              elevation: 4,
+              destinations: const [
+                NavigationRailDestination(icon: Icon(Icons.point_of_sale), label: Text('Ventas')),
+                NavigationRailDestination(icon: Icon(Icons.inventory), label: Text('Inventario')),
+                NavigationRailDestination(icon: Icon(Icons.attach_money), label: Text('Finanzas')),
+                NavigationRailDestination(icon: Icon(Icons.handshake), label: Text('Préstamos')),
+                NavigationRailDestination(icon: Icon(Icons.analytics), label: Text('Métricas')),
+                NavigationRailDestination(icon: Icon(Icons.history), label: Text('Historial')),
+              ],
+            ),
+            
+            // Línea divisoria entre el menú y la pantalla
+            const VerticalDivider(thickness: 1, width: 1, color: Colors.black12),
+            
+            // 2. EL ÁREA PRINCIPAL DONDE SE VE TU LISTA DE PRODUCTOS
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: _screens,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
