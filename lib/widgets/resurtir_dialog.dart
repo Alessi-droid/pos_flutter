@@ -1,4 +1,4 @@
-// lib/widgets/resurtir_dialog.dart
+// lib/widgets/resurtir_dialog.dart - VERSIÓN FINAL COMPLETA
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -30,14 +30,32 @@ class _ResurtirDialogState extends State<ResurtirDialog> {
   List<Producto> _sugerencias = [];
   bool _mostrarSugerencias = false;
   bool _isLoading = false;
+  int _selectedSuggestionIndex = -1;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
-    Future.delayed(const Duration(milliseconds: 200), () {
-      _searchFocus.requestFocus();
+    
+    // ⭐ PONER FOCO AUTOMÁTICAMENTE CUANDO SE ABRE EL DIALOG
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        _searchFocus.requestFocus();
+      }
     });
+  }
+
+  // ⭐ MÉTODO PÚBLICO para que ResurtirScreen ponga el foco
+  void ponerFocoEnBusqueda() {
+    if (mounted) {
+      _searchController.clear();
+      setState(() {
+        _mostrarSugerencias = false;
+        _productoSeleccionado = null;
+        _selectedSuggestionIndex = -1;
+      });
+      _searchFocus.requestFocus();
+    }
   }
 
   void _onSearchChanged() {
@@ -48,11 +66,13 @@ class _ResurtirDialogState extends State<ResurtirDialog> {
       setState(() {
         _sugerencias = [];
         _mostrarSugerencias = false;
+        _selectedSuggestionIndex = -1;
       });
     } else {
       setState(() {
         _sugerencias = provider.buscarProductos(query).take(10).toList();
         _mostrarSugerencias = _sugerencias.isNotEmpty;
+        _selectedSuggestionIndex = _sugerencias.isNotEmpty ? 0 : -1;
       });
     }
   }
@@ -64,6 +84,7 @@ class _ResurtirDialogState extends State<ResurtirDialog> {
       _costoController.text = producto.costo.toStringAsFixed(2);
       _nuevoPrecioController.text = producto.precioVenta.toStringAsFixed(2);
       _mostrarSugerencias = false;
+      _selectedSuggestionIndex = -1;
     });
   }
 
@@ -73,7 +94,6 @@ class _ResurtirDialogState extends State<ResurtirDialog> {
       return;
     }
 
-    // 👈 CAMBIADO A DOUBLE PARA PERMITIR 1.500 KG
     final cantidad = double.tryParse(_cantidadController.text);
     final costo = double.tryParse(_costoController.text);
     final nuevoPrecio = double.tryParse(_nuevoPrecioController.text);
@@ -102,7 +122,7 @@ class _ResurtirDialogState extends State<ResurtirDialog> {
     final provider = context.read<InventarioProvider>();
     final exito = await provider.resurtirProducto(
       productoId: _productoSeleccionado!.id!,
-      cantidad: cantidad, // 👈 Si marca error en rojo en VS Code, cambia "int" por "double" en tu inventario_provider
+      cantidad: cantidad,
       costoUnitario: costo,
       precioVenta: nuevoPrecio,
       turnoId: turnoProvider.turnoActivo!.id!,
@@ -118,9 +138,23 @@ class _ResurtirDialogState extends State<ResurtirDialog> {
           const SnackBar(
             content: Text('Producto resurtido exitosamente'),
             backgroundColor: AppColors.success,
+            duration: Duration(milliseconds: 1500),
           ),
         );
-        Navigator.of(context).pop();
+
+        // Limpiar y preparar para el siguiente resurtido
+        setState(() {
+          _searchController.clear();
+          _cantidadController.text = '1';
+          _costoController.clear();
+          _nuevoPrecioController.clear();
+          _productoSeleccionado = null;
+          _mostrarSugerencias = false;
+          _selectedSuggestionIndex = -1;
+        });
+        
+        // Poner el foco de nuevo en la búsqueda
+        _searchFocus.requestFocus();
       } else {
         _mostrarError('Error al resurtir');
       }
@@ -132,6 +166,7 @@ class _ResurtirDialogState extends State<ResurtirDialog> {
       SnackBar(
         content: Text(mensaje),
         backgroundColor: AppColors.error,
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -155,185 +190,193 @@ class _ResurtirDialogState extends State<ResurtirDialog> {
       child: Container(
         width: 650,
         padding: const EdgeInsets.all(AppSizes.paddingLarge),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(AppSizes.paddingMedium),
-                  decoration: BoxDecoration(
-                    color: AppColors.accentBlue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(AppSizes.radiusSmall),
-                  ),
-                  child: const Icon(
-                    Icons.add_shopping_cart,
-                    color: AppColors.accentBlue,
-                    size: AppSizes.iconLarge,
-                  ),
-                ),
-                const SizedBox(width: AppSizes.paddingMedium),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Resurtir Producto',
-                        style: TextStyle(
-                          fontSize: AppSizes.titleSmall,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        'Escanea o busca el producto a resurtir',
-                        style: TextStyle(
-                          fontSize: AppSizes.bodyMedium,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: AppSizes.paddingLarge),
-
-            // Búsqueda de producto
-            TextField(
-              controller: _searchController,
-              focusNode: _searchFocus,
-              decoration: const InputDecoration(
-                labelText: 'Buscar Producto',
-                hintText: 'Código o nombre...',
-                prefixIcon: Icon(Icons.search),
-              ),
-            ),
-
-            // Dropdown de sugerencias
-            if (_mostrarSugerencias) ...[
-              const SizedBox(height: AppSizes.paddingSmall),
-              SearchDropdown<Producto>(
-                items: _sugerencias,
-                maxHeight: 200,
-                onDismiss: () {
-                  setState(() {
-                    _mostrarSugerencias = false;
-                  });
-                },
-                itemBuilder: (context, producto, isSelected) {
-                  return ListTile(
-                    dense: true,
-                    title: Text(
-                      producto.nombreConUnidad,
-                      style: TextStyle(
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                    subtitle: Text(
-                      'Stock actual: ${producto.aGranel ? producto.stock.toStringAsFixed(2) : producto.stock}',
-                    ),
-                    trailing: Text(
-                      _currencyFormat.format(producto.precioVenta),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                    onTap: () => _seleccionarProducto(producto),
-                  );
-                },
-                onItemSelected: _seleccionarProducto,
-              ),
-            ],
-
-            const SizedBox(height: AppSizes.paddingLarge),
-
-            // Campos de cantidad, costo y nuevo precio
-            if (_productoSeleccionado != null) ...[
+        child: RawKeyboardListener(
+          focusNode: FocusNode(),
+          onKey: (event) {
+            if (event is RawKeyDownEvent && event.logicalKey == LogicalKeyboardKey.escape) {
+              Navigator.of(context).pop();
+            }
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
               Row(
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _cantidadController,
-                      decoration: const InputDecoration(
-                        labelText: 'Cantidad',
-                        helperText: 'Uds / Kgs',
-                      ),
-                      // 👈 CAMBIADO A DECIMAL CON 3 DÍGITOS PERMITIDOS
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,3}')),
-                      ],
+                  Container(
+                    padding: const EdgeInsets.all(AppSizes.paddingMedium),
+                    decoration: BoxDecoration(
+                      color: AppColors.accentBlue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(AppSizes.radiusSmall),
+                    ),
+                    child: const Icon(
+                      Icons.add_shopping_cart,
+                      color: AppColors.accentBlue,
+                      size: AppSizes.iconLarge,
                     ),
                   ),
-                  const SizedBox(width: AppSizes.paddingSmall),
-                  Expanded(
-                    child: TextField(
-                      controller: _costoController,
-                      decoration: const InputDecoration(
-                        labelText: 'Costo unitario',
-                        prefixText: '\$ ',
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: AppSizes.paddingSmall),
-                  Expanded(
-                    child: TextField(
-                      controller: _nuevoPrecioController,
-                      decoration: const InputDecoration(
-                        labelText: 'Nuevo Precio Venta',
-                        prefixText: '\$ ',
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                  const SizedBox(width: AppSizes.paddingMedium),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Resurtir Producto',
+                          style: TextStyle(
+                            fontSize: AppSizes.titleSmall,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Escanea o busca el producto a resurtir',
+                          style: TextStyle(
+                            fontSize: AppSizes.bodyMedium,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: AppSizes.paddingLarge),
-            ],
 
-            // Botones
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-                    child: const Text('CANCELAR'),
-                  ),
+              const SizedBox(height: AppSizes.paddingLarge),
+
+              // Búsqueda de producto
+              TextField(
+                controller: _searchController,
+                focusNode: _searchFocus,
+                decoration: const InputDecoration(
+                  labelText: 'Buscar Producto',
+                  hintText: 'Código o nombre...',
+                  prefixIcon: Icon(Icons.search),
                 ),
-                const SizedBox(width: AppSizes.paddingMedium),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: (_productoSeleccionado != null && !_isLoading) ? _confirmar : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accentBlue,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : const Text('CONFIRMAR'),
-                  ),
+              ),
+
+              // Dropdown de sugerencias
+              if (_mostrarSugerencias) ...[
+                const SizedBox(height: AppSizes.paddingSmall),
+                SearchDropdown<Producto>(
+                  items: _sugerencias,
+                  maxHeight: 200,
+                  selectedIndex: _selectedSuggestionIndex,
+                  onDismiss: () {
+                    setState(() {
+                      _mostrarSugerencias = false;
+                    });
+                  },
+                  itemBuilder: (context, producto, isSelected) {
+                    return ListTile(
+                      dense: true,
+                      title: Text(
+                        producto.nombreConUnidad,
+                        style: TextStyle(
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Stock actual: ${producto.aGranel ? producto.stock.toStringAsFixed(2) : producto.stock}',
+                      ),
+                      trailing: Text(
+                        _currencyFormat.format(producto.precioVenta),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                      onTap: () => _seleccionarProducto(producto),
+                    );
+                  },
+                  onItemSelected: _seleccionarProducto,
                 ),
               ],
-            ),
-          ],
+
+              const SizedBox(height: AppSizes.paddingLarge),
+
+              // Campos de cantidad, costo y nuevo precio
+              if (_productoSeleccionado != null) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _cantidadController,
+                        decoration: const InputDecoration(
+                          labelText: 'Cantidad',
+                          helperText: 'Uds / Kgs',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,3}')),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSizes.paddingSmall),
+                    Expanded(
+                      child: TextField(
+                        controller: _costoController,
+                        decoration: const InputDecoration(
+                          labelText: 'Costo unitario',
+                          prefixText: '\$ ',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSizes.paddingSmall),
+                    Expanded(
+                      child: TextField(
+                        controller: _nuevoPrecioController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nuevo Precio Venta',
+                          prefixText: '\$ ',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSizes.paddingLarge),
+              ],
+
+              // Botones
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                      child: const Text('CANCELAR'),
+                    ),
+                  ),
+                  const SizedBox(width: AppSizes.paddingMedium),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: (_productoSeleccionado != null && !_isLoading) ? _confirmar : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accentBlue,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Text('CONFIRMAR'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

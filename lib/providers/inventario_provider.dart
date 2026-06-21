@@ -157,11 +157,27 @@ class InventarioProvider extends ChangeNotifier {
 
   Future<bool> resurtirProducto({
     required int productoId,
-    required double cantidad, // 👈 ¡CORREGIDO! AHORA ACEPTA DOUBLE (EJ: 1.500)
+    required double cantidad, // 👈 ACEPTA DOUBLE (EJ: 1.500)
     required double costoUnitario,
     required double precioVenta,
     required int turnoId,
   }) async {
+    // ⭐ VALIDACIÓN CRÍTICA: Verifica que cantidad y costos sean válidos
+    if (cantidad <= 0) {
+      debugPrint('❌ CANTIDAD INVÁLIDA: $cantidad (debe ser > 0)');
+      return false;
+    }
+    
+    if (costoUnitario < 0 || precioVenta < 0) {
+      debugPrint('❌ PRECIOS INVÁLIDOS: Costo=$costoUnitario, Venta=$precioVenta (no pueden ser negativos)');
+      return false;
+    }
+    
+    if (precioVenta < costoUnitario) {
+      debugPrint('⚠️  ADVERTENCIA: Precio de venta (${precioVenta}) es menor al costo ($costoUnitario)');
+      // No abortamos, es una advertencia solamente
+    }
+    
     try {
       final db = await _dbHelper.database;
 

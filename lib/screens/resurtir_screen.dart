@@ -11,6 +11,9 @@ import '../providers/turno_provider.dart';
 import '../providers/finanzas_provider.dart';
 import '../widgets/search_dropdown.dart';
 
+// ⭐ GLOBAL KEY PARA FOCO AUTOMÁTICO
+final GlobalKey<State<ResurtirScreen>> resurtirScreenKey = GlobalKey();
+
 class ItemResurtir {
   final Producto producto;
   double cantidad;
@@ -307,6 +310,19 @@ class _ResurtirScreenState extends State<ResurtirScreen> with AutomaticKeepAlive
         ),
       ),
     );
+  }
+
+  // ⭐ MÉTODO PARA PONER FOCO AUTOMÁTICO
+  void ponerFocoEnBusqueda() {
+    if (mounted) {
+      _searchController.clear();
+      setState(() {
+        _mostrarSugerencias = false;
+        _selectedRowIndex = -1;
+        _selectedSuggestionIndex = -1;
+      });
+      _searchFocus.requestFocus();
+    }
   }
 }
 

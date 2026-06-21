@@ -125,6 +125,17 @@ class VentaProvider extends ChangeNotifier {
     try {
       final db = await _dbHelper.database;
       
+      // ⭐ VALIDACIÓN CRÍTICA: Verifica stock ANTES de procesar
+      for (var item in carritoActual) {
+        if (item.producto.stock < item.cantidad) {
+          debugPrint('❌ STOCK INSUFICIENTE: ${item.producto.nombre}');
+          debugPrint('   Disponible: ${item.producto.stock} | Requerido: ${item.cantidad}');
+          _isProcessingVenta = false;
+          notifyListeners();
+          return false; // Abortamos la venta
+        }
+      }
+      
       // ⭐ CANDADO 2: Transacción estricta. Si algo falla, NADA se guarda, la DB se protege.
       await db.transaction((txn) async {
         final venta = Venta(turnoId: turnoId, total: total, metodoPago: metodoPago, folio: folio);

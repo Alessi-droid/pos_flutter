@@ -21,6 +21,10 @@ import 'screens/prestamos_screen.dart';
 import 'screens/metricas_screen.dart';
 import 'screens/historial_screen.dart';
 
+// ⭐ GLOBAL KEYS PARA FOCO AUTOMÁTICO
+final GlobalKey<State<VentaScreen>> ventaScreenKey = GlobalKey();
+final GlobalKey<State<ResurtirScreen>> resurtirScreenKey = GlobalKey();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('es', null);
@@ -95,8 +99,18 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
 
     if (index == 1) { // 1 es Ventas
       context.read<VentaProvider>().cargarProductos();
+      // ⭐ PONER FOCO AUTOMÁTICO EN BÚSQUEDA
+      Future.delayed(const Duration(milliseconds: 50), () {
+        (ventaScreenKey.currentState as dynamic)?.ponerFocoEnBusqueda();
+      });
     } else if (index == 2 || index == 3) { // 2 es Inventario, 3 es Resurtir
       context.read<InventarioProvider>().cargarProductos();
+      // ⭐ PONER FOCO AUTOMÁTICO EN RESURTIR
+      if (index == 3) {
+        Future.delayed(const Duration(milliseconds: 50), () {
+          (resurtirScreenKey.currentState as dynamic)?.ponerFocoEnBusqueda();
+        });
+      }
     } else if (index == 4) { // 4 es Finanzas
       final turnoId = context.read<TurnoProvider>().turnoActivo?.id;
       if (turnoId != null) context.read<FinanzasProvider>().cargarBalance(turnoId);
@@ -180,9 +194,9 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
                   HomeScreen(onNavigate: _navegarAPestana), // 0
-                  const VentaScreen(),                      // 1
+                  VentaScreen(key: ventaScreenKey),         // 1
                   const InventarioScreen(),                 // 2
-                  const ResurtirScreen(),                   // 3
+                  ResurtirScreen(key: resurtirScreenKey),   // 3
                   const FinanzasScreen(),                   // 4
                   const PrestamosScreen(),                  // 5
                   const MetricasScreen(),                   // 6

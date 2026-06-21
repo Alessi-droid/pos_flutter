@@ -65,27 +65,24 @@ class _VentaScreenState extends State<VentaScreen> {
             return KeyEventResult.handled;
           }
         }
-        else if (_searchController.text.isEmpty) {
-          final provider = context.read<VentaProvider>();
+        
+        // ⭐ Navegación en CARRITO - Funciona cuando NO hay sugerencias
+        final provider = context.read<VentaProvider>();
+        if (!_mostrarSugerencias && provider.items.isNotEmpty && isArrow) {
+          if (event is KeyDownEvent) {
+            if (key == LogicalKeyboardKey.arrowDown) { setState(() => _selectedRowIndex = (_selectedRowIndex < provider.items.length - 1) ? _selectedRowIndex + 1 : _selectedRowIndex); Future.delayed(Duration.zero, _scrollToSelected); }
+            else if (key == LogicalKeyboardKey.arrowUp) { setState(() => _selectedRowIndex = (_selectedRowIndex > 0) ? _selectedRowIndex - 1 : 0); Future.delayed(Duration.zero, _scrollToSelected); }
+          }
+          return KeyEventResult.handled;
+        }
 
-          if (provider.items.isNotEmpty) {
-            if (isArrow) {
-              if (event is KeyDownEvent) {
-                if (key == LogicalKeyboardKey.arrowDown) { setState(() => _selectedRowIndex = (_selectedRowIndex < provider.items.length - 1) ? _selectedRowIndex + 1 : _selectedRowIndex); Future.delayed(Duration.zero, _scrollToSelected); }
-                else if (key == LogicalKeyboardKey.arrowUp) { setState(() => _selectedRowIndex = (_selectedRowIndex > 0) ? _selectedRowIndex - 1 : 0); Future.delayed(Duration.zero, _scrollToSelected); }
-              }
-              return KeyEventResult.handled;
-            }
-
-            if (event is KeyDownEvent) {
-              if (key == LogicalKeyboardKey.delete || key == LogicalKeyboardKey.backspace) {
-                if (_selectedRowIndex >= 0 && _selectedRowIndex < provider.items.length) { provider.eliminarItem(_selectedRowIndex); setState(() { if (_selectedRowIndex >= provider.items.length) _selectedRowIndex = provider.items.length - 1; }); }
-                return KeyEventResult.handled;
-              } else if (key == LogicalKeyboardKey.enter && _selectedRowIndex >= 0) {
-                _editarCantidadItem(_selectedRowIndex);
-                return KeyEventResult.handled;
-              }
-            }
+        if (!_mostrarSugerencias && provider.items.isNotEmpty && event is KeyDownEvent) {
+          if (key == LogicalKeyboardKey.delete || key == LogicalKeyboardKey.backspace) {
+            if (_selectedRowIndex >= 0 && _selectedRowIndex < provider.items.length) { provider.eliminarItem(_selectedRowIndex); setState(() { if (_selectedRowIndex >= provider.items.length) _selectedRowIndex = provider.items.length - 1; }); }
+            return KeyEventResult.handled;
+          } else if (key == LogicalKeyboardKey.enter && _selectedRowIndex >= 0) {
+            _editarCantidadItem(_selectedRowIndex);
+            return KeyEventResult.handled;
           }
         }
 
@@ -378,5 +375,18 @@ class _VentaScreenState extends State<VentaScreen> {
         );
       },
     );
+  }
+
+  // ⭐ MÉTODO PARA PONER FOCO AUTOMÁTICO
+  void ponerFocoEnBusqueda() {
+    if (mounted) {
+      _searchController.clear();
+      setState(() {
+        _mostrarSugerencias = false;
+        _selectedRowIndex = -1;
+        _selectedSuggestionIndex = -1;
+      });
+      _searchFocus.requestFocus();
+    }
   }
 }
