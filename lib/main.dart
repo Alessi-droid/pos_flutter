@@ -99,7 +99,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
 
     if (index == 1) { // 1 es Ventas
       context.read<VentaProvider>().cargarProductos();
-      // ⭐ PONER FOCO AUTOMÁTICO EN BÚSQUEDA
+      // ⭐ PONER FOCO AUTOMÁTICO EN BÚSQUEDA DE VENTA
       Future.delayed(const Duration(milliseconds: 50), () {
         (ventaScreenKey.currentState as dynamic)?.ponerFocoEnBusqueda();
       });

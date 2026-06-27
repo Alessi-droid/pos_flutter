@@ -33,7 +33,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 9, // ⭐ VERSIÓN 9: Catálogo estricto de Categorías
+      version: 10, // ⭐ VERSIÓN 10: Soporte múltiples IDs por producto
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -46,7 +46,7 @@ class DatabaseHelper {
     debugPrint('🛠️ Creando base de datos versión $version desde cero');
 
     // Tablas base
-    await db.execute('''CREATE TABLE productos (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT UNIQUE NOT NULL, nombre TEXT NOT NULL, costo REAL NOT NULL DEFAULT 0.0, precio_venta REAL NOT NULL DEFAULT 0.0, stock REAL NOT NULL DEFAULT 0.0, stock_minimo REAL DEFAULT 0.0, es_suelto INTEGER DEFAULT 0, producto_padre_id INTEGER, unidades_por_caja INTEGER DEFAULT 1, a_granel INTEGER DEFAULT 0, unidad_medida TEXT, fecha_creacion TEXT NOT NULL, fecha_actualizacion TEXT NOT NULL, FOREIGN KEY (producto_padre_id) REFERENCES productos (id) ON DELETE SET NULL)''');
+    await db.execute('''CREATE TABLE productos (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT UNIQUE NOT NULL, nombre TEXT NOT NULL, costo REAL NOT NULL DEFAULT 0.0, precio_venta REAL NOT NULL DEFAULT 0.0, stock REAL NOT NULL DEFAULT 0.0, stock_minimo REAL DEFAULT 0.0, es_suelto INTEGER DEFAULT 0, producto_padre_id INTEGER, unidades_por_caja INTEGER DEFAULT 1, a_granel INTEGER DEFAULT 0, unidad_medida TEXT, codigos_alternativos TEXT, fecha_creacion TEXT NOT NULL, fecha_actualizacion TEXT NOT NULL, FOREIGN KEY (producto_padre_id) REFERENCES productos (id) ON DELETE SET NULL)''');
     await db.execute('''CREATE TABLE turnos (id INTEGER PRIMARY KEY AUTOINCREMENT, monto_inicial REAL NOT NULL, fecha_apertura TEXT NOT NULL, fecha_cierre TEXT, activo INTEGER DEFAULT 1, monto_cierre REAL)''');
     await db.execute('''CREATE TABLE ventas (id INTEGER PRIMARY KEY AUTOINCREMENT, turno_id INTEGER NOT NULL, folio INTEGER NOT NULL DEFAULT 1, total REAL NOT NULL, metodo_pago TEXT NOT NULL, fecha TEXT NOT NULL, FOREIGN KEY (turno_id) REFERENCES turnos (id) ON DELETE CASCADE)''');
     await db.execute('''CREATE TABLE venta_detalle (id INTEGER PRIMARY KEY AUTOINCREMENT, venta_id INTEGER NOT NULL, producto_id INTEGER NOT NULL, cantidad REAL NOT NULL, precio_unitario REAL NOT NULL, costo_unitario REAL NOT NULL DEFAULT 0.0, subtotal REAL NOT NULL, FOREIGN KEY (venta_id) REFERENCES ventas (id) ON DELETE CASCADE, FOREIGN KEY (producto_id) REFERENCES productos (id) ON DELETE CASCADE)''');
@@ -237,6 +237,17 @@ class DatabaseHelper {
         debugPrint('✅ MIGRACIÓN DE CATEGORÍAS v8->v9 COMPLETADA.');
       } catch (e) {
         debugPrint('⚠️ Error en migración v8→v9: $e');
+      }
+    }
+
+    // ⭐ MIGRACIÓN V10: Soporte múltiples IDs por producto
+    if (oldVersion < 10) {
+      try {
+        debugPrint('🚀 INICIANDO MIGRACIÓN A MÚLTIPLES IDS (v9->v10)...');
+        await db.execute('ALTER TABLE productos ADD COLUMN codigos_alternativos TEXT');
+        debugPrint('✅ MIGRACIÓN v9→v10 COMPLETADA.');
+      } catch (e) {
+        debugPrint('⚠️ Error en migración v9→v10: $e');
       }
     }
   }

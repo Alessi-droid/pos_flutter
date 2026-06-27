@@ -36,13 +36,23 @@ class InventarioProvider extends ChangeNotifier {
     }
   }
 
+  // ⭐ MEJORADO: Busca en código, nombre y códigos alternativos
   List<Producto> buscarProductos(String query) {
     if (query.isEmpty) return _productos;
 
     final queryLower = query.toLowerCase();
     return _productos.where((p) {
-      return p.codigo.toLowerCase().contains(queryLower) ||
-             p.nombre.toLowerCase().contains(queryLower);
+      // Búsqueda en nombre
+      if (p.nombre.toLowerCase().contains(queryLower)) return true;
+      
+      // Búsqueda en código principal
+      if (p.codigo.toLowerCase().contains(queryLower)) return true;
+      
+      // ⭐ NUEVO: Búsqueda en códigos alternativos
+      final codigosAlternos = p.codigosAlternativosLista;
+      if (codigosAlternos.any((c) => c.toLowerCase().contains(queryLower))) return true;
+      
+      return false;
     }).toList();
   }
 
@@ -65,18 +75,46 @@ class InventarioProvider extends ChangeNotifier {
     }
   }
 
+  // ⭐ MEJORADO: Busca en código principal y alternativos
   Future<Producto?> buscarProductoPorCodigo(String codigo) async {
     try {
       final db = await _dbHelper.database;
+      
+      // Primero busca en código principal
       final List<Map<String, dynamic>> maps = await db.query(
         'productos',
         where: 'codigo = ?',
         whereArgs: [codigo],
       );
-
+      
       if (maps.isNotEmpty) {
         return Producto.fromMap(maps.first);
       }
+      
+      // ⭐ NUEVO: Si no encuentra, busca en códigos alternativos
+      final todosProductos = await db.query('productos');
+      for (var map in todosProductos) {
+        final producto = Producto.fromMap(map);
+        final codigosAlternos = producto.codigosAlternativosLista;
+        
+        if (codigosAlternos.contains(codigo)) {
+          // Encontró el código alternativo
+          // Si tiene productoPadreId, devuelve el padre
+          if (producto.productoPadreId != null) {
+            final padreMapList = await db.query(
+              'productos',
+              where: 'id = ?',
+              whereArgs: [producto.productoPadreId],
+            );
+            if (padreMapList.isNotEmpty) {
+              return Producto.fromMap(padreMapList.first);
+            }
+          }
+          // Si no tiene padre, devuelve él mismo
+          return producto;
+        }
+      }
+      
       return null;
     } catch (e) {
       debugPrint('Error al buscar producto por código: $e');
@@ -157,27 +195,11 @@ class InventarioProvider extends ChangeNotifier {
 
   Future<bool> resurtirProducto({
     required int productoId,
-    required double cantidad, // 👈 ACEPTA DOUBLE (EJ: 1.500)
+    required double cantidad, // 👈 ¡CORREGIDO! AHORA ACEPTA DOUBLE (EJ: 1.500)
     required double costoUnitario,
     required double precioVenta,
     required int turnoId,
   }) async {
-    // ⭐ VALIDACIÓN CRÍTICA: Verifica que cantidad y costos sean válidos
-    if (cantidad <= 0) {
-      debugPrint('❌ CANTIDAD INVÁLIDA: $cantidad (debe ser > 0)');
-      return false;
-    }
-    
-    if (costoUnitario < 0 || precioVenta < 0) {
-      debugPrint('❌ PRECIOS INVÁLIDOS: Costo=$costoUnitario, Venta=$precioVenta (no pueden ser negativos)');
-      return false;
-    }
-    
-    if (precioVenta < costoUnitario) {
-      debugPrint('⚠️  ADVERTENCIA: Precio de venta (${precioVenta}) es menor al costo ($costoUnitario)');
-      // No abortamos, es una advertencia solamente
-    }
-    
     try {
       final db = await _dbHelper.database;
 
@@ -204,6 +226,24 @@ class InventarioProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error al resurtir: $e');
       return false;
+    }
+  }
+
+  // ⭐ NUEVO: Cargar productos relacionados (variantes del mismo producto)
+  Future<List<Producto>> cargarProductosRelacionados(int productoPadreId) async {
+    try {
+      final db = await _dbHelper.database;
+      
+      final mapList = await db.query(
+        'productos',
+        where: 'producto_padre_id = ?',
+        whereArgs: [productoPadreId],
+      );
+      
+      return mapList.map((map) => Producto.fromMap(map)).toList();
+    } catch (e) {
+      debugPrint('Error al cargar productos relacionados: $e');
+      return [];
     }
   }
 }

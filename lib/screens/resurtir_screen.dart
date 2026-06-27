@@ -9,6 +9,7 @@ import '../models/producto.dart';
 import '../providers/inventario_provider.dart';
 import '../providers/turno_provider.dart';
 import '../providers/finanzas_provider.dart';
+import '../providers/venta_provider.dart';
 import '../widgets/search_dropdown.dart';
 
 // ⭐ GLOBAL KEY PARA FOCO AUTOMÁTICO
@@ -191,6 +192,9 @@ class _ResurtirScreenState extends State<ResurtirScreen> with AutomaticKeepAlive
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    // ⭐ WATCH: Se reconstruye cuando hay cambios en el carrito de ventas (stock inteligente)
+    context.watch<VentaProvider>();
+    
     WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted && ModalRoute.of(context)?.isCurrent == true) FocusScope.of(context).requestFocus(_searchFocus); });
 
     return Scaffold(
@@ -265,8 +269,32 @@ class _ResurtirScreenState extends State<ResurtirScreen> with AutomaticKeepAlive
 
                               _buildCeldaInteractiva(indexFil: index, indexCol: 0, isSelectedRow: isSelectedRow, texto: item.producto.aGranel ? item.cantidad.toStringAsFixed(2) : item.cantidad.toInt().toString(), colorTexto: Colors.teal.shade700, flex: 1),
 
-                              // ⭐ COLUMNA DE STOCK ACTUAL (Informativa, no editable)
-                              Expanded(flex: 1, child: Text(item.producto.aGranel ? item.producto.stock.toStringAsFixed(2) : item.producto.stock.toInt().toString(), textAlign: TextAlign.center, style: const TextStyle(fontSize: AppSizes.bodyMedium, color: Colors.blueGrey, fontWeight: FontWeight.bold))),
+                              // ⭐ STOCK DINÁMICO - Se actualiza en tiempo real desde VentaProvider
+                              Builder(builder: (context) {
+                                final ventaProvider = context.watch<VentaProvider>();
+                                var stockActual = item.producto.stock;
+                                
+                                // Busca el stock actual en el carrito de ventas
+                                for (var ventaItem in ventaProvider.items) {
+                                  if (ventaItem.producto.id == item.producto.id) {
+                                    stockActual = ventaItem.producto.stock;
+                                    break;
+                                  }
+                                }
+                                
+                                return Expanded(
+                                  flex: 1,
+                                  child: Text(
+                                    item.producto.aGranel ? stockActual.toStringAsFixed(2) : stockActual.toInt().toString(),
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: AppSizes.bodyMedium,
+                                      color: stockActual < 0 ? Colors.red : Colors.blueGrey,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                );
+                              }),
 
                               _buildCeldaInteractiva(indexFil: index, indexCol: 1, isSelectedRow: isSelectedRow, texto: _cFormat.format(item.costoUnitario), colorTexto: Colors.orange.shade700, flex: 2),
                               _buildCeldaInteractiva(indexFil: index, indexCol: 2, isSelectedRow: isSelectedRow, texto: _cFormat.format(item.precioVenta), colorTexto: Colors.green.shade700, flex: 2),
@@ -312,7 +340,7 @@ class _ResurtirScreenState extends State<ResurtirScreen> with AutomaticKeepAlive
     );
   }
 
-  // ⭐ MÉTODO PARA PONER FOCO AUTOMÁTICO
+  // ⭐ MÉTODO PARA PONER FOCO AUTOMÁTICO AL CAMBIAR DE PESTAÑA
   void ponerFocoEnBusqueda() {
     if (mounted) {
       _searchController.clear();

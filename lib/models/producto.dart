@@ -1,4 +1,4 @@
-// lib/models/producto.dart
+// lib/models/producto.dart - CON SOPORTE PARA MÚLTIPLES IDS/CÓDIGOS
 
 class Producto {
   final int? id;
@@ -15,6 +15,7 @@ class Producto {
   final String? unidadMedida;
   final DateTime fechaCreacion;
   final DateTime fechaActualizacion;
+  final String? codigosAlternativos; // ⭐ NUEVO: Códigos de otros distribuidores (JSON)
 
   Producto({
     this.id,
@@ -31,6 +32,7 @@ class Producto {
     this.unidadMedida,
     DateTime? fechaCreacion,
     DateTime? fechaActualizacion,
+    this.codigosAlternativos, // ⭐ NUEVO
   })  : fechaCreacion = fechaCreacion ?? DateTime.now(),
         fechaActualizacion = fechaActualizacion ?? DateTime.now();
 
@@ -46,11 +48,16 @@ class Producto {
 
   double get valorInventario => costo * stock;
 
+  // ⭐ NUEVO: Obtener lista de códigos alternativos
+  List<String> get codigosAlternativosLista {
+    if (codigosAlternativos == null || codigosAlternativos!.isEmpty) return [];
+    return codigosAlternativos!.split(',').map((c) => c.trim()).toList();
+  }
+
   /// Calcula precio sugerido con 25% de utilidad y redondea a entero
   /// Regla: 0.5 redondea hacia arriba, menor redondea hacia abajo
   static double calcularPrecioSugerido(double costo) {
     double sugerido = costo * 1.25;
-    // Redondear a entero
     double parteDecimal = sugerido - sugerido.floorToDouble();
     if (parteDecimal >= 0.5) {
       return sugerido.ceilToDouble();
@@ -75,6 +82,7 @@ class Producto {
       'unidad_medida': unidadMedida,
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_actualizacion': fechaActualizacion.toIso8601String(),
+      'codigos_alternativos': codigosAlternativos, // ⭐ NUEVO
     };
   }
 
@@ -94,6 +102,7 @@ class Producto {
       unidadMedida: map['unidad_medida'] as String?,
       fechaCreacion: DateTime.parse(map['fecha_creacion'] as String),
       fechaActualizacion: DateTime.parse(map['fecha_actualizacion'] as String),
+      codigosAlternativos: map['codigos_alternativos'] as String?, // ⭐ NUEVO
     );
   }
 
@@ -112,6 +121,7 @@ class Producto {
     String? unidadMedida,
     DateTime? fechaCreacion,
     DateTime? fechaActualizacion,
+    String? codigosAlternativos, // ⭐ NUEVO
   }) {
     return Producto(
       id: id ?? this.id,
@@ -128,6 +138,7 @@ class Producto {
       unidadMedida: unidadMedida ?? this.unidadMedida,
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
       fechaActualizacion: fechaActualizacion ?? this.fechaActualizacion,
+      codigosAlternativos: codigosAlternativos ?? this.codigosAlternativos, // ⭐ NUEVO
     );
   }
 }
